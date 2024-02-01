@@ -29,10 +29,11 @@ spec:
       - 8.8.8.8
   restartPolicy: Always
 status: {}
+==============================
+kubectl logs app-pod -n prod-env
 
-
-
-=======================
+kubectl logs app-pod -n prod-env > pod-logs.txt
+======================================
 apiVersion: v1
 kind: Pod
 metadata:
