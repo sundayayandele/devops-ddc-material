@@ -1,0 +1,262 @@
+
+https://kubectl.docs.kubernetes.io/
+=======================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostaliases-pod
+spec:
+  restartPolicy: Never
+  hostAliases:
+  - ip: "127.0.0.1"
+    hostnames:
+    - "foo.local"
+    - "bar.local"
+  - ip: "10.1.2.3"
+    hostnames:
+    - "foo.remote"
+    - "bar.remote"
+  containers:
+  - name: cat-hosts
+    image: busybox:1.28
+    command:
+    - cat
+    args:
+    - "/etc/hosts"
+====================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80
+==================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hello
+spec:
+  template:
+    # This is the pod template
+    spec:
+      containers:
+      - name: hello
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo "Hello, Kubernetes!" && sleep 3600']
+      restartPolicy: OnFailure
+    # The pod template ends here
+
+==============================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cuda-test
+spec:
+  containers:
+    - name: cuda-test
+      image: "registry.k8s.io/cuda-vector-add:v0.1"
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+  nodeSelector:
+    accelerator: nvidia-tesla-p100
+==============================================================
+kubectl apply
+Let’s explore the details of both kubectl usages. First, let’s look at kubectl apply. Listing 1 below is a manifest file that describes a Kubernetes deployment that has two replicas of our internal tool foxy
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testdeploy
+  labels:
+    app: foxapp2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: foxapp2
+  template:
+    metadata:
+      labels:
+        app: foxapp2
+    spec:
+      containers:
+      - name: foxapp2
+        image: foxytool:latest
+        ports:
+        - containerPort: 80
+The name of the deployment manifest file as testdeploy.yaml. If you run the command below, it will create a deployment according to the contents of this manifest file.
+
+# kubectl apply -f testdeploy.yaml
+deployment/testdeploy created
+================================================================================================
+Scenario 2: Customize DNS settings for a pod
+
+To customize DNS settings for a Deployment, you must specify dnsPolicy: None for the DNS policy settings. Example:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alpine
+  namespace: default
+spec:
+  containers:
+  - image: alpine
+    command:
+      - sleep
+      - "10000"
+    imagePullPolicy: Always
+    name: alpine
+  dnsPolicy: None
+  dnsConfig:
+    nameservers: ["169.254.xx.xx"]
+    searches:
+    - default.svc.cluster.local
+    - svc.cluster.local
+    - cluster.local
+    options:
+    - name: ndots
+      value: "2"
+https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/configure-dns-resolution#:~:text=The%20startup%20parameters%20of%20kubelet,server%20in%20the%20ACK%20cluster.&text=Specifies%20the%20IP%20addresses%20of%20the%20DNS%20servers.
+========================================================================
+75
+
+If you're willing to use a Volume and a ConfigMap, you can mount ConfigMap data as a script, and then run that script:
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  entrypoint.sh: |-
+    #!/bin/bash
+    echo "Do this"
+
+    echo "Do that"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  containers:
+  - name: my-container
+    image: "ubuntu:14.04"
+    command:
+    - /bin/entrypoint.sh
+    volumeMounts:
+    - name: configmap-volume
+      mountPath: /bin/entrypoint.sh
+      readOnly: true
+      subPath: entrypoint.sh
+  volumes:
+  - name: configmap-volume
+    configMap:
+      defaultMode: 0700
+      name: my-configmap
+==============================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: busy
+    image: busybox:1.28
+    command: ["/bin/sh", "-c"]
+    args:
+    - >
+      command_1 &&
+      command_2 &&
+      ... 
+      command_n
+=======================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: busybox
+  name: busybox
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -c
+    - |
+      echo "running below scripts"
+      i=0; 
+      while true; 
+      do 
+        echo "$i: $(date)"; 
+        i=$((i+1)); 
+        sleep 1; 
+      done
+    name: busybox
+    image: busybox
+===================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multiline
+spec:
+  template:
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -exc
+        - |
+          set +x
+          echo "running below scripts"
+          if [[ -f "if-condition.sh" ]]; then
+            echo "Running if success"
+          else
+            echo "Running if failed"
+          fi
+        name: ubuntu
+        image: ubuntu
+      restartPolicy: Never
+  backoffLimit: 1
+  ==========================
+https://stackoverflow.com/questions/33887194/how-to-set-multiple-commands-in-one-yaml-file-with-kubernetes
+Here is one more way to do it, with output logging.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    type: test
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    volumeMounts:
+      - name: log-vol
+        mountPath: /var/mylog
+    command:
+        - /bin/sh
+        - -c
+        - >
+            i=0;
+            while [ $i -lt 100 ];
+            do
+             echo "hello $i";
+             echo "$i :  $(date)" >> /var/mylog/1.log;
+             echo "$(date)" >> /var/mylog/2.log;
+             i=$((i+1));
+             sleep 1;
+            done
+
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  volumes:
+    - name: log-vol
+      emptyDir: {}
